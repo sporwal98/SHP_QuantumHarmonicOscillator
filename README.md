@@ -1,4 +1,10 @@
 # SHP_QuantumHarmonicOscillator
+UPDATE: New structure of code:
+1. 'main' method for simulation
+2. 'Action' class to implement action of various systems.
+3. 'Observe' class to implement observables
+4. 'Metropolis' class to implement Metropolis time-step
+
 
 This project simulates the functioning of a 1-D Quantum Harmonic Oscillator, using a Markov Chain Monte Carlo Method.
 The current structure of the code is such:
