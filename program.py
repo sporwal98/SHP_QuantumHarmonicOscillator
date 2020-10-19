@@ -173,21 +173,20 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     naccept = np.zeros(nsites) #counter for acceptances
     sum_x = np.zeros(nsites) #sum of x, used for <x>
     sum_xx = np.zeros(nsites) #sum of x^2, used for <x^2>
-    avgx = []
+    xpos = np.array([])
     ts = []
 
     for i in range(niter):#number of sweeps
         order = np.random.permutation(nsites)
-        
-        avgx.append(np.mean(lattice.positions))
+        xpos = np.append(xpos, lattice.positions)
         ts.append(tmc)
         for j in range(nsites):#for each sweep
             x = lattice.positions[order[j]]
             xnew, acc = met.step(x)
             if(acc):
                 naccept[order[j]]+=1
-                lattice.positions[j] = xnew
-
+                lattice.positions[order[j]] = xnew
+        
         sum_x +=lattice.positions
         sum_xx +=lattice.positions**2
         tmc+=1
@@ -196,25 +195,22 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     print('avg acceptance')
     print(acceptance)
 
-    '''
-    mu = np.mean(sum_x)/niter
-    rms = np.mean(sum_xx)/niter
+    
+    mu = sum_x/niter
+    rms = sum_xx/niter
     var = rms - (mu**2)
 
     sigma = np.sqrt(var)
     gaussx = np.linspace(mu - 3*sigma, mu + 3*sigma, 100)
     normal = np.exp(-gaussx**2/2*var)/(sigma*np.sqrt(2*np.pi))
-    '''
+
     plt.clf()
-    #plt.plot(gaussx, normal,color = 'r',label = 'gaussian')
-    plt.hist(avgx, bins = int(np.sqrt(niter)),label = 'histogram')
+    plt.plot(np.mean(gaussx,axis = 1), np.mean(normal,axis = 1),color = 'r',label = 'gaussian')
+    plt.hist(xpos, bins = int(np.sqrt(niter*nsites)),label = 'histogram', density = True)
     plt.title('Position Histogram '+ str(niter)+' steps on '+str(nsites)+' sites')
     plt.legend()
     plt.show()
 
-    plt.clf()
-    plt.plot(avgx, ts)
-    plt.show()
     
     return 0
 
