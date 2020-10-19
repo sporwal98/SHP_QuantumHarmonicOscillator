@@ -57,7 +57,7 @@ class Metropolis:
 
 class State:
     '''
-    Class for State of QHO
+    Class for State of multisite QHO
     '''
     def __init__(self,nsites, omega = 1, mass = 1):
         self.positions = np.zeros(nsites)
@@ -196,7 +196,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     print('avg acceptance')
     print(acceptance)
 
-
+    '''
     mu = np.mean(sum_x)/niter
     rms = np.mean(sum_xx)/niter
     var = rms - (mu**2)
@@ -204,10 +204,11 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     sigma = np.sqrt(var)
     gaussx = np.linspace(mu - 3*sigma, mu + 3*sigma, 100)
     normal = np.exp(-gaussx**2/2*var)/(sigma*np.sqrt(2*np.pi))
+    '''
     plt.clf()
-    plt.plot(gaussx, normal,color = 'r',label = 'gaussian')
-    plt.hist(avgx, bins = int(np.sqrt(niter)),label = 'histogram', density = True)
-    plt.title('Position Histogram and Gaussian '+ str(niter))
+    #plt.plot(gaussx, normal,color = 'r',label = 'gaussian')
+    plt.hist(avgx, bins = int(np.sqrt(niter)),label = 'histogram')
+    plt.title('Position Histogram '+ str(niter)+' steps on '+str(nsites)+' sites')
     plt.legend()
     plt.show()
 
