@@ -65,7 +65,7 @@ class State:
         self.mass = mass
     
 
-def main(output = 'output.txt', ss = 1e0, niterations = 1000, skip = 0):
+def singlesite(output = 'output.txt', ss = 1e0, niterations = 1000, skip = 0):
     '''
     Main simulation code
     '''
