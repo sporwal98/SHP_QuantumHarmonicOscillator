@@ -15,13 +15,8 @@ class Observe:
         return result
 
     def selfac(self, sitepositions,timeshift, niter):
-        result = 0.0
-        for i in range(niter):
-            for j in range(niter):
-                if(np.mod((j-i), niter)==timeshift):
-                    result += sitepositions[i]*sitepositions[j]
-
-        result = result/niter
+        result = np.multiply(sitepositions,np.roll(sitepositions,timeshift*niter))        
+        result = np.sum(result,axis = 1)/niter
         return result
 
 class Action:
@@ -237,18 +232,28 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     plt.show()
 
     obs.xpos = np.reshape(obs.xpos, (niter,nsites))
+    obs.xpos2 = np.reshape(obs.xpos2, (niter,nsites))
 
     autocorrs = []
     for i in range(niter):
+        #autocorrs.append(obs.selfac(obs.xpos,i,niter))
+        '''
+        if(np.mod(i,10) == 0 ):
+            print(i)
+        '''
         autocorrs.append(np.mean(obs.selfac(obs.xpos,i,niter)))
-
+    autocorrs = np.array(autocorrs)
     print(autocorrs.shape)
     plt.clf()
-    plt.plot(ts,autocorrs)
+    plt.plot(ts[skip:],autocorrs[skip:])
     plt.xlabel('Time')
-    plt.ylabel('Positions')
+    plt.ylabel('Autocorrelation(for Time difference)')
     plt.show()
-    
+
+    plt.clf()
+
+    linefit = np.polyfit(ts,autocorrs, deg = 1)
+    print(linefit)
 
     
     return 0
