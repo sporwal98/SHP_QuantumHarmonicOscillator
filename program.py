@@ -4,7 +4,15 @@ from scipy.stats import norm
 
 class Observe:
     def __init__(self):
+        self.sum_x = 0.0
+        self.sum_xx = 0.0
+        self.posx = 0.0
         return
+
+    def autocorr(x):
+        result = numpy.correlate(x, x, mode='full')
+        return result[result.size/2:]
+    
 
 class Action:
     '''
@@ -17,11 +25,13 @@ class Action:
 
     def harmonic_act(self,x):
         #Calculation of Harmonic Oscillator Action
-        return 0.5*self.mass*self.omega* x**2
+        
+        return 0.5*self.mass*self.omega**2*x**2 #+ self.diff_actionwrtx(x-np.roll(x,1)) 
+        
 
     def diff_actionwrtx(self,x):
         #Differential of action wrt x
-        return self.mass*self.omega* x**2
+        return self.mass*self.omega*x
     
     
         
@@ -168,17 +178,18 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     lattice = State(nsites = ns)
     
     act = Action(m = 1, om = 1) #mass and omega just for generalisation
-    met = Metropolis(ss = stepsize, act = act) 
+    met = Metropolis(ss = stepsize, act = act) #Metropolis object
+    obs = Observe() # Object for observables.
     
     naccept = np.zeros(nsites) #counter for acceptances
-    sum_x = np.zeros(nsites) #sum of x, used for <x>
-    sum_xx = np.zeros(nsites) #sum of x^2, used for <x^2>
-    xpos = np.array([])
+    obs.sum_x = np.zeros(nsites) #sum of x, used for <x>
+    obs.sum_xx = np.zeros(nsites) #sum of x^2, used for <x^2>
+    obs.xpos = np.array([])
     ts = []
 
     for i in range(niter):#number of sweeps
         order = np.random.permutation(nsites)
-        xpos = np.append(xpos, lattice.positions)
+        obs.xpos = np.append(obs.xpos, lattice.positions)
         ts.append(tmc)
         for j in range(nsites):#for each sweep
             x = lattice.positions[order[j]]
@@ -187,17 +198,17 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
                 naccept[order[j]]+=1
                 lattice.positions[order[j]] = xnew
         
-        sum_x +=lattice.positions
-        sum_xx +=lattice.positions**2
+        obs.sum_x +=lattice.positions
+        obs.sum_xx +=lattice.positions**2
         tmc+=1
 
     acceptance = np.mean(naccept/niter)
     print('avg acceptance')
     print(acceptance)
-
+    print(obs.xpos.shape)
     
-    mu = sum_x/niter
-    rms = sum_xx/niter
+    mu = obs.sum_x/niter
+    rms = obs.sum_xx/niter
     var = rms - (mu**2)
 
     sigma = np.sqrt(var)
@@ -205,8 +216,9 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     normal = np.exp(-gaussx**2/2*var)/(sigma*np.sqrt(2*np.pi))
 
     plt.clf()
-    plt.plot(np.mean(gaussx,axis = 1), np.mean(normal,axis = 1),color = 'r',label = 'gaussian')
-    plt.hist(xpos, bins = int(np.sqrt(niter*nsites)),label = 'histogram', density = True)
+    #plt.plot(gaussx,np.mean(normal,axis = 1),color = 'r',label = 'gaussian')
+    plt.plot(np.mean(gaussx,axis = 1),np.mean(normal,axis = 1),color = 'g',label = 'mean gaussian')
+    plt.hist(obs.xpos, bins = int(np.sqrt(niter*nsites)),label = 'histogram', density = True)
     plt.title('Position Histogram '+ str(niter)+' steps on '+str(nsites)+' sites')
     plt.legend()
     plt.show()
