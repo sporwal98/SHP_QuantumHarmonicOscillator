@@ -6,13 +6,23 @@ class Observe:
     def __init__(self):
         self.sum_x = 0.0
         self.sum_xx = 0.0
-        self.posx = 0.0
+        self.xpos = 0.0
+        self.xpos2 = 0.0
         return
 
-    def autocorr(x):
-        result = numpy.correlate(x, x, mode='full')
-        return result[result.size/2:]
-    
+    def autocorr(self,x):
+        result = np.correlate(x, x, mode='full')
+        return result
+
+    def selfac(self, sitepositions,timeshift, niter):
+        result = 0.0
+        for i in range(niter):
+            for j in range(niter):
+                if(np.mod((j-i), niter)==timeshift):
+                    result += sitepositions[i]*sitepositions[j]
+
+        result = result/niter
+        return result
 
 class Action:
     '''
@@ -185,11 +195,14 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     obs.sum_x = np.zeros(nsites) #sum of x, used for <x>
     obs.sum_xx = np.zeros(nsites) #sum of x^2, used for <x^2>
     obs.xpos = np.array([])
+    obs.xpos2 = np.array([])
     ts = []
 
     for i in range(niter):#number of sweeps
         order = np.random.permutation(nsites)
+
         obs.xpos = np.append(obs.xpos, lattice.positions)
+        obs.xpos2 = np.append(obs.xpos2, lattice.positions**2)
         ts.append(tmc)
         for j in range(nsites):#for each sweep
             x = lattice.positions[order[j]]
@@ -205,7 +218,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     acceptance = np.mean(naccept/niter)
     print('avg acceptance')
     print(acceptance)
-    print(obs.xpos.shape)
+    #print(obs.xpos.shape)
     
     mu = obs.sum_x/niter
     rms = obs.sum_xx/niter
@@ -219,9 +232,23 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     #plt.plot(gaussx,np.mean(normal,axis = 1),color = 'r',label = 'gaussian')
     plt.plot(np.mean(gaussx,axis = 1),np.mean(normal,axis = 1),color = 'g',label = 'mean gaussian')
     plt.hist(obs.xpos, bins = int(np.sqrt(niter*nsites)),label = 'histogram', density = True)
-    plt.title('Position Histogram '+ str(niter)+' steps on '+str(nsites)+' sites')
+    plt.title('Position Histogram: '+ str(niter)+' steps on '+str(nsites)+' sites')
     plt.legend()
     plt.show()
+
+    obs.xpos = np.reshape(obs.xpos, (niter,nsites))
+
+    autocorrs = []
+    for i in range(niter):
+        autocorrs.append(np.mean(obs.selfac(obs.xpos,i,niter)))
+
+    print(autocorrs.shape)
+    plt.clf()
+    plt.plot(ts,autocorrs)
+    plt.xlabel('Time')
+    plt.ylabel('Positions')
+    plt.show()
+    
 
     
     return 0
