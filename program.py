@@ -10,13 +10,9 @@ class Observe:
         self.xpos2 = 0.0
         return
 
-    def autocorr(self,x):
-        result = np.correlate(x, x, mode='full')
-        return result
-
     def selfac(self, sitepositions,timeshift, niter):
         result = np.multiply(sitepositions,np.roll(sitepositions,timeshift*niter))        
-        result = np.sum(result,axis = 1)/niter
+        result = np.sum(result,axis = 0)/niter
         return result
 
 class Action:
@@ -172,6 +168,7 @@ def singlesite(output = 'output.txt', ss = 1e0, niterations = 1000, skip = 0):
     return 0
 
 def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip = 0):
+    #multisite monte carlo
     np.random.seed(42) #random seed for consistent results
     idt = 0 #euclidean time i in {1,...,ntau}
     tmc = 0 #Monte Carlo timesteps
@@ -189,8 +186,8 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     naccept = np.zeros(nsites) #counter for acceptances
     obs.sum_x = np.zeros(nsites) #sum of x, used for <x>
     obs.sum_xx = np.zeros(nsites) #sum of x^2, used for <x^2>
-    obs.xpos = np.array([])
-    obs.xpos2 = np.array([])
+    obs.xpos = np.array([])#store x positions for each time step
+    obs.xpos2 = np.array([])#store x^2 for each time step
     ts = []
 
     for i in range(niter):#number of sweeps
@@ -237,6 +234,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
     autocorrs = []
     for i in range(niter):
         #autocorrs.append(obs.selfac(obs.xpos,i,niter))
+        #autocorrelation of x for each time difference(from 0 to niterations-1)
         '''
         if(np.mod(i,10) == 0 ):
             print(i)
@@ -252,10 +250,9 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, skip
 
     plt.clf()
 
-    linefit = np.polyfit(ts,autocorrs, deg = 1)
+    linefit = np.polyfit(np.mean(obs.xpos,axis = 1),autocorrs, deg = 1)
     print(linefit)
 
-    
     return 0
 
 
