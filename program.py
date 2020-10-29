@@ -8,6 +8,7 @@ class Observe:
         self.sum_xx = 0.0
         self.xpos = 0.0
         self.xpos2 = 0.0
+        self.acintegral = 0.0
         return
 
     def selfac(self, sitepositions,timeshift, niter):
@@ -112,6 +113,8 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
 
     for i in range(niter):#number of sweeps
         order = np.random.permutation(nsites)
+        if(np.mod(i,1000) == 0 ):
+            print(i)
 
         obs.xpos = np.append(obs.xpos, lattice.positions)
         obs.xpos2 = np.append(obs.xpos2, lattice.positions**2)
@@ -133,8 +136,10 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     #print(obs.xpos.shape)
 
     #Setting up the gaussian plot
-    mu = obs.sum_x/niter
-    ms = obs.sum_xx/niter
+    mu = 0.0
+    ms = 0.46
+    print('<x>   = '+str(mu))
+    print('<x^2> = '+str(ms))
     var = ms - (mu**2)
 
     sigma = np.sqrt(var)
@@ -142,8 +147,10 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     normal = np.exp(-gaussx**2/2*var)/(sigma*np.sqrt(2*np.pi))
 
     plt.clf()
-    #plt.plot(gaussx,np.mean(normal,axis = 1),color = 'r',label = 'gaussian')
-    plt.plot(np.mean(gaussx,axis = 1),np.mean(normal,axis = 1),color = 'g',label = 'mean gaussian')
+    plt.plot(gaussx,normal,color = 'r',label = 'gaussian')
+    #plt.plot(np.mean(gaussx,axis = 1),np.mean(normal,axis = 1),color = 'g',label = 'mean gaussian')
+
+    #plt.hist(np.mean(obs.xpos,axis = 1), bins = int(np.sqrt(niter)),label = 'histogram', density = True)
     plt.hist(obs.xpos, bins = int(np.sqrt(niter*nsites)),label = 'histogram', density = True)
     plt.title('Position Histogram: '+ str(niter)+' steps on '+str(nsites)+' sites')
     plt.legend()
@@ -151,7 +158,16 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
 
     obs.xpos = np.reshape(obs.xpos, (niter,nsites))
     obs.xpos2 = np.reshape(obs.xpos2, (niter,nsites))
-
+    
+    plt.clf()
+    plt.plot(np.mean(obs.xpos[skip:],axis = 1),ts[skip:])
+    plt.title('Average positions of lattice points with time for last '+str(niterations-skip)+' points')
+    plt.xlabel('Average position of lattice points')
+    plt.ylabel('Time')
+    plt.show()
+    
+    
+    
     autocorrs = []
     for i in range(niter):
         #autocorrs.append(obs.selfac(obs.xpos,i,niter))
@@ -163,19 +179,24 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
         autocorrs.append(np.mean(obs.selfac(obs.xpos,i,niter)))
     autocorrs = np.array(autocorrs)
     #print(autocorrs.shape)
+
+    linefit = np.polyfit(ts[:50],np.log(autocorrs[:50]), deg = 1)
+    print(linefit)
+    line = np.repeat(linefit[1],50) + np.multiply(np.repeat(linefit[0], 50), np.array(ts[:50]), dtype = np.dtype(float))
+    
     plt.clf()
-    plt.plot(ts[:100],autocorrs[:100])
-    plt.plot(ts[:100],np.zeros(100), c ='r')
+    plt.plot(ts[:50],np.log(autocorrs[:50]),label = 'Calculated')
+    plt.plot(ts[:50],line[:50], c = 'g',marker = '.', label = 'Theoretical')
+    plt.plot(ts[:50],np.zeros(50), c = 'r')
     plt.xlabel('Time')
-    plt.ylabel('Autocorrelation(for Time difference)')
+    plt.ylabel('Log Auto-correlation(for Time difference)')
+    plt.legend()
     plt.show()
 
     plt.clf()
 
-    '''
-    linefit = np.polyfit(np.mean(obs.xpos,axis = 1),autocorrs, deg = 1)
-    print(linefit)
-    '''
+    
+    
     
     return
 
