@@ -185,8 +185,8 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     line = np.repeat(linefit[1],50) + np.multiply(np.repeat(linefit[0], 50), np.array(ts[:50]), dtype = np.dtype(float))
     
     plt.clf()
-    plt.plot(ts[:50],np.log(autocorrs[:50]),label = 'Calculated')
-    plt.plot(ts[:50],line[:50], c = 'g',marker = '.', label = 'Theoretical')
+    plt.plot(ts[:50],np.log(autocorrs[:50]),label = 'Calculated',marker = '.')
+    plt.plot(ts[:50],line[:50], c = 'g', label = 'Theoretical')
     plt.plot(ts[:50],np.zeros(50), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Log Auto-correlation(for Time difference)')
