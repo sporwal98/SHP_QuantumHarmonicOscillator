@@ -11,10 +11,15 @@ class Observe:
         self.acintegral = 0.0
         return
 
-    def selfac(self, sitepositions,timeshift, niter):
-        result = np.multiply(sitepositions,np.roll(sitepositions,timeshift, axis = 0))        
+    def selfac(self, sitepositions,timeshift, niter,ax = 0):
+        result = np.multiply(sitepositions,np.roll(sitepositions,timeshift, axis = ax))        
         result = np.sum(result,axis = 0)/niter
         return result
+
+    def intac(self,ac):
+        ac = 0.5*(ac + np.roll(ac,1))
+        return np.sum(ac)
+        
 
 class Action:
     '''
@@ -136,19 +141,19 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     #print(obs.xpos.shape)
 
     #Setting up the gaussian plot
-    mu = 0.0
-    ms = 0.46
-    print('<x>   = '+str(mu))
-    print('<x^2> = '+str(ms))
+    mu = obs.sum_x/niter
+    ms = obs.sum_xx/niter
+    #print('<x>   = '+str(mu))
+    #print('<x^2> = '+str(ms))
     var = ms - (mu**2)
 
     sigma = np.sqrt(var)
     gaussx = np.linspace(mu - 3*sigma, mu + 3*sigma, 100)
-    normal = np.exp(-gaussx**2/2*var)/(sigma*np.sqrt(2*np.pi))
+    normal = norm.pdf(gaussx,mu,sigma)
 
     plt.clf()
-    plt.plot(gaussx,normal,color = 'r',label = 'gaussian')
-    #plt.plot(np.mean(gaussx,axis = 1),np.mean(normal,axis = 1),color = 'g',label = 'mean gaussian')
+    #plt.plot(gaussx,normal,color = 'r',label = 'gaussian')
+    plt.plot(np.mean(gaussx,axis = 1),np.mean(normal,axis = 1),color = 'g',label = 'mean gaussian')
 
     #plt.hist(np.mean(obs.xpos,axis = 1), bins = int(np.sqrt(niter)),label = 'histogram', density = True)
     plt.hist(obs.xpos, bins = int(np.sqrt(niter*nsites)),label = 'histogram', density = True)
@@ -161,7 +166,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     
     plt.clf()
     plt.plot(np.mean(obs.xpos[skip:],axis = 1),ts[skip:])
-    plt.title('Average positions of lattice points with time for last '+str(niterations-skip)+' points')
+    plt.title('Average position of lattice points with time for last '+str(niterations-skip)+' points')
     plt.xlabel('Average position of lattice points')
     plt.ylabel('Time')
     plt.show()
@@ -172,22 +177,23 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     for i in range(niter):
         #autocorrs.append(obs.selfac(obs.xpos,i,niter))
         #autocorrelation of x for each time difference(from 0 to niterations-1)
-        '''
-        if(np.mod(i,10) == 0 ):
+        
+        if(np.mod(i,1000) == 0 ):
             print(i)
-        '''
+        
         autocorrs.append(np.mean(obs.selfac(obs.xpos,i,niter)))
     autocorrs = np.array(autocorrs)
     #print(autocorrs.shape)
 
-    linefit = np.polyfit(ts[:50],np.log(autocorrs[:50]), deg = 1)
+    linefit = np.polyfit(ts[:100],np.log(autocorrs[:100]), deg = 1)
     print(linefit)
-    line = np.repeat(linefit[1],50) + np.multiply(np.repeat(linefit[0], 50), np.array(ts[:50]), dtype = np.dtype(float))
+    line = np.repeat(linefit[1],100) + np.multiply(np.repeat(linefit[0], 100), np.array(ts[:100]), dtype = np.dtype(float))
     
     plt.clf()
-    plt.plot(ts[:50],np.log(autocorrs[:50]),label = 'Calculated',marker = '.')
-    plt.plot(ts[:50],line[:50], c = 'g', label = 'Theoretical')
-    plt.plot(ts[:50],np.zeros(50), c = 'r')
+    #plt.plot(ts[:100],np.log(autocorrs[:100]),label = 'Calculated',marker = '.')
+    plt.plot(ts[:100],autocorrs[:100],label = 'Autocorrelation',marker = '.')
+    #plt.plot(ts[:100],line[:100], c = 'g', label = 'Theoretical')
+    plt.plot(ts[:100],np.zeros(100), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Log Auto-correlation(for Time difference)')
     plt.legend()
@@ -195,6 +201,31 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
 
     plt.clf()
 
+
+    intautocorr = obs.intac(autocorrs)
+    print('Integrated autocorr = '+str(intautocorr))
+
+    corrs = []
+    for i in range(niter):
+        #autocorrs.append(obs.selfac(obs.xpos,i,niter))
+        #autocorrelation of x for each time difference(from 0 to niterations-1)
+        
+        if(np.mod(i,1000) == 0 ):
+            print(i)
+        
+        corrs.append(np.mean(obs.selfac(obs.xpos,i,niter,ax =1)))
+    corrs = np.array(corrs)
+
+    plt.clf()
+    plt.plot(ts[:101],corrs[:101],label = 'Correlation function',marker = '.')
+    plt.plot(ts[:101],np.zeros(101), c = 'r')
+    plt.xlabel('Time')
+    plt.ylabel('Correlation function(for Time difference)')
+    plt.legend()
+    plt.show()
+    #print(autocorrs.shape)
+
+    
     
     
     
