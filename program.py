@@ -87,14 +87,21 @@ class State:
     '''
     Class for State of multisite QHO
     '''
-    def __init__(self,nsites, omega = 1, mass = 1):
-        self.positions = np.zeros(nsites)
+    def __init__(self,nsites, s ='c', omega = 1, mass = 1):
+        #s = 'h' is hot start. ie. all initial positions = random number
+        #s = 'c is cold start, ie. all initial positions = 0(also default)
+        if(s == 'h'):
+            #hot start
+            self.positions = np.random.random(nsites)
+        else:
+            #cold start
+            self.positions = np.zeros(nsites)
         self.omega = omega
         self.mass = mass
     
 
 
-def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omega = 1,skip = 0, plot = 20):
+def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omega = 1,skip = 0, plotac = 100,plotco = 101,start = 'c'):
     #multisite monte carlo
     np.random.seed(42) #random seed for consistent results
     idt = 0 #euclidean time i in {1,...,ntau}
@@ -104,7 +111,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     stepsize = ss #increments in position(permitted positions)
 
     nsites = ns #number of sites(ntau)
-    lattice = State(nsites = ns)
+    lattice = State(nsites = ns,s = start)
     
     act = Action(om = omega) #mass and omega just for generalisation
     met = Metropolis(ss = stepsize, act = act) #Metropolis object
@@ -136,6 +143,8 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
         obs.sum_xx +=lattice.positions**2
         tmc+=1
 
+    ts = np.array(ts)
+
     acceptance = np.mean(naccept/niter)
     print('avg acceptance')
     print(acceptance)
@@ -164,7 +173,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
 
     obs.xpos = np.reshape(obs.xpos, (niter,nsites))
     obs.xpos2 = np.reshape(obs.xpos2, (niter,nsites))
-    
+
     plt.clf()
     plt.plot(np.mean(obs.xpos[skip:],axis = 1),ts[skip:])
     plt.title('Average position of lattice points with time for last '+str(niterations-skip)+' points')
@@ -188,15 +197,16 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
         acerrs.append(np.mean(err))
     autocorrs = np.array(autocorrs)
     acerrs = np.array(acerrs)
-    #print(autocorrs.shape)
+    #print(autocorrs.shape)a
 
-    linefit = np.polyfit(ts[:plot],np.log(autocorrs[:plot]), deg = 1)
+    linefit = np.polyfit(ts[:40],np.log(autocorrs[:40]), deg = 1)
     print(linefit)
-    line = np.repeat(linefit[1],plot) + np.multiply(np.repeat(linefit[0], plot), np.array(ts[:plot]), dtype = np.dtype(float))
+    line = np.repeat(linefit[1],50) + np.multiply(np.repeat(linefit[0], 50), np.array(ts[:50]), dtype = np.dtype(float))
 
-    intautocorr = obs.intac(autocorrs[:plot])
+    intautocorr = obs.intac(autocorrs[:plotac])
     print('Integrated autocorr = '+str(intautocorr))
-    
+
+    acerrs = (2*intautocorr+1)*acerrs
     poserrors = autocorrs + acerrs
     negerrors = autocorrs - acerrs
 
@@ -205,22 +215,22 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     
     plt.clf()
     #plt.plot(ts[:100],np.log(autocorrs[:100]),label = 'Calculated',marker = '.')
-    plt.plot(ts[:plot],autocorrs[:plot],label = 'Autocorrelation',marker = '.')
+    plt.plot(ts[:plotac],autocorrs[:plotac],label = 'Autocorrelation',marker = '.')
     #plt.plot(ts[:100],line[:100], c = 'g', label = 'Theoretical')
-    plt.plot(ts[:plot],poserrors[:plot],label = 'Positive error',linestyle = 'dashed')
-    plt.plot(ts[:plot],negerrors[:plot],label = 'Negative error',linestyle = 'dashed')
-    plt.plot(ts[:plot],np.zeros(plot), c = 'r')
+    plt.plot(ts[:plotac],poserrors[:plotac],label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[:plotac],negerrors[:plotac],label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[:plotac],np.zeros(plotac), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Auto-correlation(for Time difference)')
     plt.legend()
     plt.show()
 
     plt.clf()
-    plt.plot(ts[:plot],np.log(autocorrs[:plot]),label = 'Calculated',marker = '.')
-    plt.plot(ts[:plot],np.log(poserrors[:plot]),label = 'Positive error',linestyle = 'dashed')
-    plt.plot(ts[:plot],np.log(negerrors[:plot]),label = 'Negative error',linestyle = 'dashed')
-    plt.plot(ts[:plot],line[:plot], c = 'c',linestyle = 'dashed', label = 'Theoretical')
-    plt.plot(ts[:plot],np.zeros(plot), c = 'r')
+    plt.plot(ts[:50],np.log(autocorrs[:50]),label = 'Calculated(slope = '+str(linefit[0]),marker = '.')
+    plt.plot(ts[:50],np.log(poserrors[:50]),label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[:50],np.log(negerrors[:50]),label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[:50],line[:50], c = 'c',linestyle = 'dashed', label = 'Theoretical')
+    plt.plot(ts[:50],np.zeros(50), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Log Auto-correlation(for Time difference)')
     plt.legend()
@@ -242,6 +252,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     corrs = np.array(corrs)
     errs = np.array(errs)
 
+    errs = (intautocorr*2+1)*errs
     poserrors = corrs + acerrs
     negerrors = corrs - acerrs
 
@@ -249,20 +260,21 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     #negerrors*=intautocorr
 
     plt.clf()
-    plt.plot(ts[:plot],corrs[:plot],label = 'Correlation function',marker = '.')
-    plt.plot(ts[:plot],poserrors[:plot],label = 'Positive error',linestyle = 'dashed')
-    plt.plot(ts[:plot],negerrors[:plot],label = 'Negative error',linestyle = 'dashed')
-    plt.plot(ts[:plot],np.zeros(plot), c = 'r')
+    plt.plot(ts[:101],corrs[:101],label = 'Correlation function',marker = '.')
+    plt.plot(ts[:101],poserrors[:101],label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[:101],negerrors[:101],label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[:101],np.zeros(101), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Correlation function(for Time difference)')
     plt.legend()
     plt.show()
 
     plt.clf()
-    plt.plot(ts[:plot],np.log(corrs[:plot]),label = 'Log Correlation function',marker = '.')
-    plt.plot(ts[:plot],np.log(poserrors[:plot]),label = 'Positive error',linestyle = 'dashed')
-    plt.plot(ts[:plot],np.log(negerrors[:plot]),label = 'Negative error',linestyle = 'dashed')
-    plt.plot(ts[:plot],np.zeros(plot), c = 'r')
+    plt.plot(ts[:plotco],np.log(corrs[:plotco]),label = 'Log Correlation function',marker = '.')
+    plt.plot(ts[:plotco],np.log(poserrors[:plotco]),label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[:plotco],np.log(negerrors[:plotco]),label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[:plotco],(np.log(corrs[0])-omega*ts[:plotco]),linestyle = 'dashed', c = 'c',label = 'Theoretical')
+    plt.plot(ts[:plotco],np.zeros(plotco), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Log Correlation function(for Time difference)')
     plt.legend()
