@@ -12,13 +12,14 @@ class Observe:
         return
 
     def selfac(self, sitepositions,timeshift, niter,ax = 0):
-        result = np.multiply(sitepositions,np.roll(sitepositions,timeshift, axis = ax))        
+        result = np.multiply(sitepositions,np.roll(sitepositions,timeshift, axis = ax))
+        errs = np.std(result)/niter
         result = np.sum(result,axis = 0)/niter
-        return result
+        return (result,errs)
 
     def intac(self,ac):
-        ac = 0.5*(ac + np.roll(ac,1))
-        return np.sum(ac)
+        intac = 0.5*(ac + np.roll(ac,1))
+        return np.sum(intac)
         
 
 class Action:
@@ -93,7 +94,7 @@ class State:
     
 
 
-def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omega = 1,skip = 0):
+def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omega = 1,skip = 0, plot = 20):
     #multisite monte carlo
     np.random.seed(42) #random seed for consistent results
     idt = 0 #euclidean time i in {1,...,ntau}
@@ -174,53 +175,96 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     
     
     autocorrs = []
+    acerrs = []
     for i in range(niter):
         #autocorrs.append(obs.selfac(obs.xpos,i,niter))
         #autocorrelation of x for each time difference(from 0 to niterations-1)
         
         if(np.mod(i,1000) == 0 ):
             print(i)
-        
-        autocorrs.append(np.mean(obs.selfac(obs.xpos,i,niter)))
+
+        res,err = obs.selfac(obs.xpos,i,niter)
+        autocorrs.append(np.mean(res))
+        acerrs.append(np.mean(err))
     autocorrs = np.array(autocorrs)
+    acerrs = np.array(acerrs)
     #print(autocorrs.shape)
 
-    linefit = np.polyfit(ts[:100],np.log(autocorrs[:100]), deg = 1)
+    linefit = np.polyfit(ts[:plot],np.log(autocorrs[:plot]), deg = 1)
     print(linefit)
-    line = np.repeat(linefit[1],100) + np.multiply(np.repeat(linefit[0], 100), np.array(ts[:100]), dtype = np.dtype(float))
+    line = np.repeat(linefit[1],plot) + np.multiply(np.repeat(linefit[0], plot), np.array(ts[:plot]), dtype = np.dtype(float))
+
+    intautocorr = obs.intac(autocorrs[:plot])
+    print('Integrated autocorr = '+str(intautocorr))
+    
+    poserrors = autocorrs + acerrs
+    negerrors = autocorrs - acerrs
+
+    #poserrors*=intautocorr
+    #negerrors*=intautocorr
     
     plt.clf()
     #plt.plot(ts[:100],np.log(autocorrs[:100]),label = 'Calculated',marker = '.')
-    plt.plot(ts[:100],autocorrs[:100],label = 'Autocorrelation',marker = '.')
+    plt.plot(ts[:plot],autocorrs[:plot],label = 'Autocorrelation',marker = '.')
     #plt.plot(ts[:100],line[:100], c = 'g', label = 'Theoretical')
-    plt.plot(ts[:100],np.zeros(100), c = 'r')
+    plt.plot(ts[:plot],poserrors[:plot],label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[:plot],negerrors[:plot],label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[:plot],np.zeros(plot), c = 'r')
+    plt.xlabel('Time')
+    plt.ylabel('Auto-correlation(for Time difference)')
+    plt.legend()
+    plt.show()
+
+    plt.clf()
+    plt.plot(ts[:plot],np.log(autocorrs[:plot]),label = 'Calculated',marker = '.')
+    plt.plot(ts[:plot],np.log(poserrors[:plot]),label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[:plot],np.log(negerrors[:plot]),label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[:plot],line[:plot], c = 'c',linestyle = 'dashed', label = 'Theoretical')
+    plt.plot(ts[:plot],np.zeros(plot), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Log Auto-correlation(for Time difference)')
     plt.legend()
     plt.show()
 
-    plt.clf()
-
-
-    intautocorr = obs.intac(autocorrs)
-    print('Integrated autocorr = '+str(intautocorr))
 
     corrs = []
+    errs = []
     for i in range(niter):
         #autocorrs.append(obs.selfac(obs.xpos,i,niter))
         #autocorrelation of x for each time difference(from 0 to niterations-1)
         
         if(np.mod(i,1000) == 0 ):
             print(i)
-        
-        corrs.append(np.mean(obs.selfac(obs.xpos,i,niter,ax =1)))
+
+        res, err = obs.selfac(obs.xpos,i,niter,ax  =1)
+        corrs.append(np.mean(res))
+        errs.append(np.mean(err))
     corrs = np.array(corrs)
+    errs = np.array(errs)
+
+    poserrors = corrs + acerrs
+    negerrors = corrs - acerrs
+
+    #poserrors*=intautocorr
+    #negerrors*=intautocorr
 
     plt.clf()
-    plt.plot(ts[:101],corrs[:101],label = 'Correlation function',marker = '.')
-    plt.plot(ts[:101],np.zeros(101), c = 'r')
+    plt.plot(ts[:plot],corrs[:plot],label = 'Correlation function',marker = '.')
+    plt.plot(ts[:plot],poserrors[:plot],label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[:plot],negerrors[:plot],label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[:plot],np.zeros(plot), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Correlation function(for Time difference)')
+    plt.legend()
+    plt.show()
+
+    plt.clf()
+    plt.plot(ts[:plot],np.log(corrs[:plot]),label = 'Log Correlation function',marker = '.')
+    plt.plot(ts[:plot],np.log(poserrors[:plot]),label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[:plot],np.log(negerrors[:plot]),label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[:plot],np.zeros(plot), c = 'r')
+    plt.xlabel('Time')
+    plt.ylabel('Log Correlation function(for Time difference)')
     plt.legend()
     plt.show()
     #print(autocorrs.shape)
