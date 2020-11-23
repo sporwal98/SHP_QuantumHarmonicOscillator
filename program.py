@@ -26,9 +26,10 @@ class Action:
     '''
     Class for action
     '''
-    def __init__(self, om = 1):
+    def __init__(self, om = 1, l = 0):
         self.mass = 1
         self.omega = om
+        self.lamb = l
         return
 
     def harmonic_act_old(self,x):
@@ -42,11 +43,17 @@ class Action:
             action += (0.5*(x[(i+1)%len(x)]-x[i])**2)+(0.5*self.omega**2*x[i]**2)
         return action
 
+    def anharmonic_act(self, x):
+        action = 0.0
+        for i in range(len(x)):
+            action += (0.5*(x[(i+1)%len(x)]-x[i])**2)+(0.5*self.omega**2*x[i]**2)+(0.25*self.lamb*x[i]**4)
+        return action
+
     def del_act(self,xold,xnew,idx):
         del_act = 0.0
         for i in range(idx-1,idx+1):
-            oldpart = 0.5*(xold[(i+1)%len(xold)]-xold[i])**2 + 0.5*(self.omega**2)*(xold[i]**2)
-            newpart = 0.5*(xnew[(i+1)%len(xnew)]-xnew[i])**2 + 0.5*(self.omega**2)*(xnew[i]**2)
+            oldpart = 0.5*(xold[(i+1)%len(xold)]-xold[i])**2 + 0.5*(self.omega**2)*(xold[i]**2)+(0.25*self.lamb*xold[i]**4)
+            newpart = 0.5*(xnew[(i+1)%len(xnew)]-xnew[i])**2 + 0.5*(self.omega**2)*(xnew[i]**2)+(0.25*self.lamb*xnew[i]**4)
             del_act += newpart-oldpart
 
         return del_act
@@ -101,7 +108,7 @@ class State:
     
 
 
-def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omega = 1,skip = 0, plotac = 100,plotco = 101,start = 'c'):
+def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omega = 1,skip = 0, plotac = 100,plotco = 101,start = 'c',anh = 0):
     #multisite monte carlo
     np.random.seed(42) #random seed for consistent results
     idt = 0 #euclidean time i in {1,...,ntau}
@@ -113,7 +120,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     nsites = ns #number of sites(ntau)
     lattice = State(nsites = ns,s = start)
     
-    act = Action(om = omega) #mass and omega just for generalisation
+    act = Action(om = omega, l = anh) #mass and omega just for generalisation
     met = Metropolis(ss = stepsize, act = act) #Metropolis object
     obs = Observe() # Object for observables.
     
@@ -122,13 +129,15 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     obs.sum_xx = np.zeros(nsites) #sum of x^2, used for <x^2>
     obs.xpos = np.array([])#store x positions for each time step
     obs.xpos2 = np.array([])#store x^2 for each time step
+    obs.actions = np.array([])
     ts = []
 
     for i in range(niter):#number of sweeps
         order = np.random.permutation(nsites)
         if(np.mod(i,1000) == 0 ):
             print(i)
-
+        
+        obs.actions = np.append(obs.actions,act.anharmonic_act(lattice.positions))
         obs.xpos = np.append(obs.xpos, lattice.positions)
         obs.xpos2 = np.append(obs.xpos2, lattice.positions**2)
         ts.append(tmc)
@@ -174,13 +183,21 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     obs.xpos = np.reshape(obs.xpos, (niter,nsites))
     obs.xpos2 = np.reshape(obs.xpos2, (niter,nsites))
 
-    plt.clf()
+    '''plt.clf()
     plt.plot(np.mean(obs.xpos[skip:],axis = 1),ts[skip:])
     plt.title('Average position of lattice points with time for last '+str(niterations-skip)+' points')
     plt.xlabel('Average position of lattice points')
     plt.ylabel('Time')
     plt.show()
-    
+    '''
+
+    estart = 0
+    plt.clf()
+    plt.plot(ts[estart:],obs.actions[estart:])
+    plt.title('Action vs Time')
+    plt.xlabel('Time')
+    plt.ylabel('Action')
+    plt.show()
     
     
     autocorrs = []
@@ -203,7 +220,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     print(linefit)
     line = np.repeat(linefit[1],50) + np.multiply(np.repeat(linefit[0], 50), np.array(ts[:50]), dtype = np.dtype(float))
 
-    intautocorr = obs.intac(autocorrs[:plotac])
+    intautocorr = obs.intac(autocorrs[20:plotac])
     print('Integrated autocorr = '+str(intautocorr))
 
     acerrs = (2*intautocorr+1)*acerrs
@@ -212,14 +229,15 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
 
     #poserrors*=intautocorr
     #negerrors*=intautocorr
-    
+
+    acs = 0
     plt.clf()
     #plt.plot(ts[:100],np.log(autocorrs[:100]),label = 'Calculated',marker = '.')
-    plt.plot(ts[:plotac],autocorrs[:plotac],label = 'Autocorrelation',marker = '.')
+    plt.plot(ts[acs:plotac],autocorrs[acs:plotac],label = 'Autocorrelation',marker = '.')
     #plt.plot(ts[:100],line[:100], c = 'g', label = 'Theoretical')
-    plt.plot(ts[:plotac],poserrors[:plotac],label = 'Positive error',linestyle = 'dashed')
-    plt.plot(ts[:plotac],negerrors[:plotac],label = 'Negative error',linestyle = 'dashed')
-    plt.plot(ts[:plotac],np.zeros(plotac), c = 'r')
+    plt.plot(ts[acs:plotac],poserrors[acs:plotac],label = 'Positive error',linestyle = 'dashed')
+    plt.plot(ts[acs:plotac],negerrors[acs:plotac],label = 'Negative error',linestyle = 'dashed')
+    plt.plot(ts[acs:plotac],np.zeros(plotac-acs), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Auto-correlation(for Time difference)')
     plt.legend()
