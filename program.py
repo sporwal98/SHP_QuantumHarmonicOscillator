@@ -26,34 +26,44 @@ class Action:
     '''
     Class for action
     '''
-    def __init__(self, om = 1, l = 0):
+    def __init__(self, om = 1, l = 0, om2 = 1):
         self.mass = 1
         self.omega = om
         self.lamb = l
+        self.omega2 = om2
         return
 
     def harmonic_act_old(self,x):
         #Calculation of Harmonic Oscillator Action
         
-        return 0.5*self.mass*self.omega**2*x**2
+        return 0.5*self.mass*self.omega2*x**2
 
     def harmonic_act(self, x):
         action = 0.0
         for i in range(len(x)):
-            action += (0.5*(x[(i+1)%len(x)]-x[i])**2)+(0.5*self.omega**2*x[i]**2)
+            action += (0.5*(x[(i+1)%len(x)]-x[i])**2)+(0.5*self.omega2*x[i]**2)
         return action
 
     def anharmonic_act(self, x):
         action = 0.0
         for i in range(len(x)):
-            action += (0.5*(x[(i+1)%len(x)]-x[i])**2)+(0.5*self.omega**2*x[i]**2)+(0.25*self.lamb*x[i]**4)
+            action += (0.5*(x[(i+1)%len(x)]-x[i])**2)+self.potential(x[i])
         return action
 
+    def potential_old(self,x):
+        pot = (0.5*self.omega2*x**2)+(0.25*self.lamb*x**4)
+        return pot
+
+    def potential(self,x):
+        pot = self.lamb*(x**2-1)**2
+        return pot
+
+    
     def del_act(self,xold,xnew,idx):
         del_act = 0.0
         for i in range(idx-1,idx+1):
-            oldpart = 0.5*(xold[(i+1)%len(xold)]-xold[i])**2 + 0.5*(self.omega**2)*(xold[i]**2)+(0.25*self.lamb*xold[i]**4)
-            newpart = 0.5*(xnew[(i+1)%len(xnew)]-xnew[i])**2 + 0.5*(self.omega**2)*(xnew[i]**2)+(0.25*self.lamb*xnew[i]**4)
+            oldpart = 0.5*(xold[(i+1)%len(xold)]-xold[i])**2 + self.potential(xold[i])
+            newpart = 0.5*(xnew[(i+1)%len(xnew)]-xnew[i])**2 + self.potential(xnew[i])
             del_act += newpart-oldpart
 
         return del_act
@@ -102,15 +112,15 @@ class State:
             self.positions = np.random.random(nsites)
         else:
             #cold start
-            self.positions = np.zeros(nsites)
+            self.positions = -np.ones(nsites)
         self.omega = omega
         self.mass = mass
     
 
 
-def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omega = 1,skip = 0, plotac = 100,plotco = 101,start = 'c',anh = 0):
+def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 = 1,skip = 0, plotac = 100,plotco = 101,start = 'c',anh = 0):
     #multisite monte carlo
-    np.random.seed(42) #random seed for consistent results
+    np.random.seed(123) #random seed for consistent results
     idt = 0 #euclidean time i in {1,...,ntau}
     tmc = 0 #Monte Carlo timesteps
 
@@ -120,7 +130,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     nsites = ns #number of sites(ntau)
     lattice = State(nsites = ns,s = start)
     
-    act = Action(om = omega, l = anh) #mass and omega just for generalisation
+    act = Action(om2 = om2, l = anh) #mass and omega just for generalisation
     met = Metropolis(ss = stepsize, act = act) #Metropolis object
     obs = Observe() # Object for observables.
     
@@ -137,7 +147,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
         if(np.mod(i,1000) == 0 ):
             print(i)
         
-        obs.actions = np.append(obs.actions,act.anharmonic_act(lattice.positions))
+        obs.actions = np.append(obs.actions,act.potential(lattice.positions))
         obs.xpos = np.append(obs.xpos, lattice.positions)
         obs.xpos2 = np.append(obs.xpos2, lattice.positions**2)
         ts.append(tmc)
@@ -170,6 +180,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     gaussx = np.linspace(mu - 3*sigma, mu + 3*sigma, 100)
     normal = norm.pdf(gaussx,mu,sigma)
 
+    '''
     plt.clf()
     #plt.plot(gaussx,normal,color = 'r',label = 'gaussian')
     plt.plot(np.mean(gaussx,axis = 1),np.mean(normal,axis = 1),color = 'g',label = 'mean gaussian')
@@ -179,27 +190,32 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     plt.title('Position Histogram: '+ str(niter)+' steps on '+str(nsites)+' sites')
     plt.legend()
     plt.show()
-
+    '''
+    
     obs.xpos = np.reshape(obs.xpos, (niter,nsites))
     obs.xpos2 = np.reshape(obs.xpos2, (niter,nsites))
-
-    '''plt.clf()
+    
+    plt.clf()
     plt.plot(np.mean(obs.xpos[skip:],axis = 1),ts[skip:])
     plt.title('Average position of lattice points with time for last '+str(niterations-skip)+' points')
     plt.xlabel('Average position of lattice points')
     plt.ylabel('Time')
     plt.show()
-    '''
+    
 
-    estart = 0
     plt.clf()
-    plt.plot(ts[estart:],obs.actions[estart:])
-    plt.title('Action vs Time')
-    plt.xlabel('Time')
-    plt.ylabel('Action')
+    for lambd in range(-10,-1,+1):
+        mini = 1.0
+        act = Action(om2 = -mini*lambd, l = lambd) 
+        pos = np.arange(-2.0,+2.2,0.2)
+        plt.plot(pos,-act.potential(pos), label = 'om2 = '+str(-mini*lambd)+',lambda = '+str(lambd))
+        plt.title('Potential vs Positions, min  = ' +str(mini))
+        plt.xlabel('Position')
+        plt.ylabel('Potential')
+    plt.legend()
     plt.show()
     
-    
+    '''
     autocorrs = []
     acerrs = []
     for i in range(niter):
@@ -302,7 +318,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, omeg
     
     
     
-    
+    '''
     return
 
 
