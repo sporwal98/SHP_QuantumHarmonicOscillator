@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import norm
 
 class Observe:
+    #Class to implement recording of observables
     def __init__(self):
         self.sum_x = 0.0
         self.sum_xx = 0.0
@@ -12,12 +13,14 @@ class Observe:
         return
 
     def selfac(self, sitepositions,timeshift, niter,ax = 0):
+        #Auto-correlation function (ax = 0), Correlation function (ax = 1)
         result = np.multiply(sitepositions,np.roll(sitepositions,timeshift, axis = ax))
         errs = np.std(result)/niter
         result = np.sum(result,axis = 0)/niter
         return (result,errs)
 
     def intac(self,ac):
+        #Integrated auto-correlation from the auto-correlation
         intac = 0.5*(ac + np.roll(ac,1))
         return np.sum(intac)
         
@@ -34,32 +37,32 @@ class Action:
         return
 
     def harmonic_act_old(self,x):
+        #Single point Harmonic Oscillator Action
         #Calculation of Harmonic Oscillator Action
         
         return 0.5*self.mass*self.omega2*x**2
 
     def harmonic_act(self, x):
+        #Harmonic Oscillator action
         action = 0.0
         for i in range(len(x)):
             action += (0.5*(x[(i+1)%len(x)]-x[i])**2)+(0.5*self.omega2*x[i]**2)
         return action
 
     def anharmonic_act(self, x):
+        #Anharmonic oscillator action
         action = 0.0
         for i in range(len(x)):
             action += (0.5*(x[(i+1)%len(x)]-x[i])**2)+self.potential(x[i])
         return action
 
-    def potential_old(self,x):
+    def potential(self,x):
+        #Defining an-harmonic potential
         pot = (0.5*self.omega2*x**2)+(0.25*self.lamb*x**4)
         return pot
-
-    def potential(self,x):
-        pot = self.lamb*(x**2-1)**2
-        return pot
-
     
     def del_act(self,xold,xnew,idx):
+        #Change in action
         del_act = 0.0
         for i in range(idx-1,idx+1):
             oldpart = 0.5*(xold[(i+1)%len(xold)]-xold[i])**2 + self.potential(xold[i])
@@ -112,15 +115,18 @@ class State:
             self.positions = np.random.random(nsites)
         else:
             #cold start
-            self.positions = -np.ones(nsites)
+            self.positions = np.zeros(nsites)
         self.omega = omega
         self.mass = mass
     
 
 
 def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 = 1,skip = 0, plotac = 100,plotco = 101,start = 'c',anh = 0):
-    #multisite monte carlo
-    np.random.seed(123) #random seed for consistent results
+    #Multisite monte carlo
+    #ss->step-size, niterations->no of steps, ns->no of lattice sites, om2->omega squared
+    #skip->positions to skip(for plot), plotac->how many time-diffs to plot for AC, plotco-> how many lattice distances to plot for corr
+    #start-> hot start or cold start, anh-> anharmonicity lambda
+    #np.random.seed(123) #random seed for consistent results
     idt = 0 #euclidean time i in {1,...,ntau}
     tmc = 0 #Monte Carlo timesteps
 
@@ -142,6 +148,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 
     obs.actions = np.array([])
     ts = []
 
+    #Trajectory calculations(actual behaviour part of the code
     for i in range(niter):#number of sweeps
         order = np.random.permutation(nsites)
         if(np.mod(i,1000) == 0 ):
@@ -164,60 +171,79 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 
 
     ts = np.array(ts)
 
+    #acceptance rate
     acceptance = np.mean(naccept/niter)
     print('avg acceptance')
-    print(acceptance)
+    print(np.round(acceptance,decimals = 2))
     #print(obs.xpos.shape)
 
     #Setting up the gaussian plot
+    #Gaussian plot parameters
     mu = obs.sum_x/niter
     ms = obs.sum_xx/niter
-    #print('<x>   = '+str(mu))
-    #print('<x^2> = '+str(ms))
+    print('<x>   = '+str(np.round(np.mean(mu),decimals = 3)))
+    print('<x^2> = '+str(np.round(np.mean(ms),decimals = 3)))
     var = ms - (mu**2)
 
+    #Gaussian Plot Values
     sigma = np.sqrt(var)
     gaussx = np.linspace(mu - 3*sigma, mu + 3*sigma, 100)
     normal = norm.pdf(gaussx,mu,sigma)
 
-    '''
+    #Plotting histogram and Gaussian
     plt.clf()
     #plt.plot(gaussx,normal,color = 'r',label = 'gaussian')
     plt.plot(np.mean(gaussx,axis = 1),np.mean(normal,axis = 1),color = 'g',label = 'mean gaussian')
-
     #plt.hist(np.mean(obs.xpos,axis = 1), bins = int(np.sqrt(niter)),label = 'histogram', density = True)
     plt.hist(obs.xpos, bins = int(np.sqrt(niter*nsites)),label = 'histogram', density = True)
     plt.title('Position Histogram: '+ str(niter)+' steps on '+str(nsites)+' sites')
     plt.legend()
-    plt.show()
-    '''
+    plt.savefig('FINAL_REPORT_100sites_50000steps/Fig1')
     
+    #row i = time-step i
+    #column j = lattice point j
     obs.xpos = np.reshape(obs.xpos, (niter,nsites))
     obs.xpos2 = np.reshape(obs.xpos2, (niter,nsites))
-    
+
+
+    #Plotting path of representative lattice point
     plt.clf()
-    plt.plot(np.mean(obs.xpos[skip:],axis = 1),ts[skip:])
+    #plt.plot(np.mean(obs.xpos[skip:],axis = 1),ts[skip:],linestyle = 'dashed')
+    plt.plot(obs.xpos[skip:,5], ts[skip:])
     plt.title('Average position of lattice points with time for last '+str(niterations-skip)+' points')
     plt.xlabel('Average position of lattice points')
     plt.ylabel('Time')
-    plt.show()
-    
+    #plt.show()
+    plt.savefig('FINAL_REPORT_100sites_50000steps/Fig2')
 
+    #Plotting the potential
+    mini = 0.0
+    if(anh!=0):mini = np.sqrt(-om2/anh)
     plt.clf()
-    for lambd in range(-10,-1,+1):
-        mini = 1.0
-        act = Action(om2 = -mini*lambd, l = lambd) 
-        pos = np.arange(-2.0,+2.2,0.2)
-        plt.plot(pos,-act.potential(pos), label = 'om2 = '+str(-mini*lambd)+',lambda = '+str(lambd))
-        plt.title('Potential vs Positions, min  = ' +str(mini))
-        plt.xlabel('Position')
-        plt.ylabel('Potential')
+    pos = np.arange(-5.0,+5.1,0.1)
+    plt.plot(pos,act.potential(pos),label = 'om2 = '+str(om2)+' lambda = '+str(anh))
+    plt.title('Potential vs Positions, min at pos x = ' +str(mini))
+    plt.xlabel('Position')
+    plt.ylabel('Potential')
     plt.legend()
-    plt.show()
+    plt.savefig('FINAL_REPORT_100sites_50000steps/Fig3')
+
+    #ONLY FOR ANHARMONIC: scaling of potential bump
+    if(anh!=0):
+        plt.clf()
+        for lambd in np.arange(1,5,1):
+            act = Action(om2 = -mini*lambd, l = lambd) 
+            pos = np.arange(-5.0,+5.1,0.1)
+            plt.plot(pos,act.potential(pos), label = 'om2 = '+str(np.round(-mini*lambd,decimals = 1))+',lambda = '+str(np.round(lambd,decimals = 1)))
+            plt.title('Potential vs Positions, min  = ' +str(mini))
+            plt.xlabel('Position')
+            plt.ylabel('Potential')
+        plt.legend()
+        plt.savefig('FINAL_REPORT_100sites_50000steps/Fig4')
     
-    '''
     autocorrs = []
     acerrs = []
+    #Calculating auto-correlation and error
     for i in range(niter):
         #autocorrs.append(obs.selfac(obs.xpos,i,niter))
         #autocorrelation of x for each time difference(from 0 to niterations-1)
@@ -232,13 +258,16 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 
     acerrs = np.array(acerrs)
     #print(autocorrs.shape)a
 
+    #Finding line-fit of log autocorr
     linefit = np.polyfit(ts[:40],np.log(autocorrs[:40]), deg = 1)
     print(linefit)
     line = np.repeat(linefit[1],50) + np.multiply(np.repeat(linefit[0], 50), np.array(ts[:50]), dtype = np.dtype(float))
 
+    #Integrated Auto-correlation
     intautocorr = obs.intac(autocorrs[20:plotac])
-    print('Integrated autocorr = '+str(intautocorr))
+    print('Integrated autocorr = '+str(np.round(intautocorr,decimals = 3)))
 
+    #Adjusting errors byt the IntAC
     acerrs = (2*intautocorr+1)*acerrs
     poserrors = autocorrs + acerrs
     negerrors = autocorrs - acerrs
@@ -246,6 +275,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 
     #poserrors*=intautocorr
     #negerrors*=intautocorr
 
+    #Plot of Auto-correlation
     acs = 0
     plt.clf()
     #plt.plot(ts[:100],np.log(autocorrs[:100]),label = 'Calculated',marker = '.')
@@ -257,22 +287,27 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 
     plt.xlabel('Time')
     plt.ylabel('Auto-correlation(for Time difference)')
     plt.legend()
-    plt.show()
+    #plt.show()
+    plt.savefig('FINAL_REPORT_100sites_50000steps/Fig5.png')
 
+    #PLot log-autocorrelation
     plt.clf()
-    plt.plot(ts[:50],np.log(autocorrs[:50]),label = 'Calculated(slope = '+str(linefit[0]),marker = '.')
+    plt.plot(ts[:50],np.log(autocorrs[:50]),label = 'Calculated(slope = '+str(np.round(linefit[1],decimals = 3)),marker = '.')
     plt.plot(ts[:50],np.log(poserrors[:50]),label = 'Positive error',linestyle = 'dashed')
     plt.plot(ts[:50],np.log(negerrors[:50]),label = 'Negative error',linestyle = 'dashed')
-    plt.plot(ts[:50],line[:50], c = 'c',linestyle = 'dashed', label = 'Theoretical')
     plt.plot(ts[:50],np.zeros(50), c = 'r')
     plt.xlabel('Time')
     plt.ylabel('Log Auto-correlation(for Time difference)')
     plt.legend()
-    plt.show()
+    #plt.show()
+    plt.savefig('FINAL_REPORT_100sites_50000steps/Fig6.png')
+    
 
-
+    print('AC done')
+    
     corrs = []
     errs = []
+    #Correlation and error
     for i in range(niter):
         #autocorrs.append(obs.selfac(obs.xpos,i,niter))
         #autocorrelation of x for each time difference(from 0 to niterations-1)
@@ -286,6 +321,7 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 
     corrs = np.array(corrs)
     errs = np.array(errs)
 
+    #Adjusting error for IntAC
     errs = (intautocorr*2+1)*errs
     poserrors = corrs + acerrs
     negerrors = corrs - acerrs
@@ -293,32 +329,36 @@ def multisite(output = 'output.txt', ss = 1e0, niterations = 1000, ns = 10, om2 
     #poserrors*=intautocorr
     #negerrors*=intautocorr
 
+    #Plot corr
     plt.clf()
     plt.plot(ts[:101],corrs[:101],label = 'Correlation function',marker = '.')
     plt.plot(ts[:101],poserrors[:101],label = 'Positive error',linestyle = 'dashed')
     plt.plot(ts[:101],negerrors[:101],label = 'Negative error',linestyle = 'dashed')
     plt.plot(ts[:101],np.zeros(101), c = 'r')
-    plt.xlabel('Time')
-    plt.ylabel('Correlation function(for Time difference)')
+    plt.xlabel('Lattice point distance')
+    plt.ylabel('Correlation function vs. lattice distance')
     plt.legend()
-    plt.show()
+    #plt.show()
+    plt.savefig('FINAL_REPORT_100sites_50000steps/Fig7.png')
 
+
+    #Plot log-corr
     plt.clf()
     plt.plot(ts[:plotco],np.log(corrs[:plotco]),label = 'Log Correlation function',marker = '.')
     plt.plot(ts[:plotco],np.log(poserrors[:plotco]),label = 'Positive error',linestyle = 'dashed')
     plt.plot(ts[:plotco],np.log(negerrors[:plotco]),label = 'Negative error',linestyle = 'dashed')
-    plt.plot(ts[:plotco],(np.log(corrs[0])-omega*ts[:plotco]),linestyle = 'dashed', c = 'c',label = 'Theoretical')
+    #plt.plot(ts[:plotco],(np.log(corrs[0])-act.omega*ts[:plotco]),linestyle = 'dashed', c = 'c',label = 'Theoretical')
     plt.plot(ts[:plotco],np.zeros(plotco), c = 'r')
-    plt.xlabel('Time')
-    plt.ylabel('Log Correlation function(for Time difference)')
+    plt.xlabel('Lattice distance')
+    plt.ylabel('Log Correlation functionvs vs. lattice distance')
     plt.legend()
-    plt.show()
+    #plt.show()
+    plt.savefig('FINAL_REPORT_100sites_50000steps/Fig8.png')
     #print(autocorrs.shape)
-
     
     
     
-    '''
+    
     return
 
 
